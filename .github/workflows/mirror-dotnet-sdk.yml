@@ -1,0 +1,56 @@
+name: "Mirror: dotnet/sdk → GHCR"
+
+# Mirrors mcr.microsoft.com/dotnet/sdk:8.0-bookworm-slim (Microsoft Container
+# Registry, backed by Azure Container Registry) into GHCR, so the CyberDrain
+# app images keep building during an MCR / ACR outage. See README.md.
+
+on:
+  schedule:
+    # Weekly, Monday 06:00 UTC — picks up the monthly .NET patch releases.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/mirror-dotnet-sdk.yml"
+
+env:
+  IMAGE: dotnet/sdk:8.0-bookworm-slim
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set lower case owner name
+        run: echo "OWNER_LC=${OWNER,,}" >> $GITHUB_ENV
+        env:
+          OWNER: ${{ github.repository_owner }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Mirror ${{ env.IMAGE }}
+        run: |
+          set -euo pipefail
+          SRC="mcr.microsoft.com/${IMAGE}"
+          DST="ghcr.io/${OWNER_LC}/${IMAGE}"
+
+          echo "Mirroring $SRC -> $DST"
+          # Copies the full multi-arch manifest (amd64 + arm64) straight
+          # between registries — layers are mounted, not pulled into the runner.
+          docker buildx imagetools create --tag "$DST" "$SRC"
+
+          echo "::group::Mirrored manifest"
+          docker buildx imagetools inspect "$DST"
+          echo "::endgroup::"
