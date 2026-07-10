@@ -21,10 +21,15 @@ while the upstream is down.
 The .NET base images from the Microsoft Container Registry (`mcr.microsoft.com`,
 backed by Azure Container Registry):
 
-| Upstream (MCR)                                      | Mirror (GHCR)                                          |
-| --------------------------------------------------- | ------------------------------------------------------ |
-| `mcr.microsoft.com/dotnet/sdk:8.0-bookworm-slim`    | `ghcr.io/<owner>/dotnet/sdk:8.0-bookworm-slim`         |
-| `mcr.microsoft.com/dotnet/aspnet:8.0-bookworm-slim` | `ghcr.io/<owner>/dotnet/aspnet:8.0-bookworm-slim`      |
+| Upstream (MCR)                                                      | Mirror (GHCR)                                                     |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `mcr.microsoft.com/dotnet/sdk:8.0-bookworm-slim`                    | `ghcr.io/<owner>/dotnet/sdk:8.0-bookworm-slim`                   |
+| `mcr.microsoft.com/dotnet/aspnet:8.0-bookworm-slim`                 | `ghcr.io/<owner>/dotnet/aspnet:8.0-bookworm-slim`                |
+| `mcr.microsoft.com/dotnet/aspnet:8.0-azurelinux3.0-distroless-extra` | `ghcr.io/<owner>/dotnet/aspnet:8.0-azurelinux3.0-distroless-extra` |
+
+Their roles in the Craft build: the **SDK** compiles/publishes the app, the
+**Debian aspnet** stages libmimalloc, and the **Azure Linux distroless-extra
+aspnet** is the runtime base of the shipped (distroless) image.
 
 The path after the registry host is preserved verbatim, and `<owner>` is the
 lower-cased repository owner.
@@ -35,6 +40,7 @@ Each image has its own workflow:
 
 - [`.github/workflows/mirror-dotnet-sdk.yml`](.github/workflows/mirror-dotnet-sdk.yml)
 - [`.github/workflows/mirror-dotnet-aspnet.yml`](.github/workflows/mirror-dotnet-aspnet.yml)
+- [`.github/workflows/mirror-dotnet-aspnet-distroless.yml`](.github/workflows/mirror-dotnet-aspnet-distroless.yml)
 
 Each runs weekly (Monday 06:00 UTC), on demand (`workflow_dispatch`), and when
 its own workflow file changes. They authenticate to GHCR with the default
