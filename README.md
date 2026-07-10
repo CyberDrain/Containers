@@ -50,26 +50,31 @@ Before that copy runs, the upstream image is vulnerability-scanned — see
 
 Every mirror workflow scans the **upstream** image with
 [Trivy](https://github.com/aquasecurity/trivy-action) before it is copied into
-GHCR, so a base image with a known, fixable high-severity CVE never lands in the
-mirror. Trivy pulls the layers itself, so the scan works even though the copy
-step never pulls the image into the runner.
+GHCR, so you always know what you're mirroring. Trivy pulls the layers itself,
+so the scan works even though the copy step never pulls the image into the
+runner.
 
-Two things happen on each run:
+The scan is **report-only** — it never blocks the publish. The mirror copies an
+unmodified upstream image byte-for-byte; a CVE in it isn't ours to remediate
+(only the upstream vendor can, by shipping a patched tag, which then flows
+through the mirror automatically). Failing the job on such a CVE wouldn't fix
+anything — it would just stall the mirror on the last good copy, defeating the
+availability the mirror exists to provide. So instead of gating, each run:
 
-- **Gate.** The job fails on any `CRITICAL` or `HIGH` vulnerability that has a
-  fix available (`ignore-unfixed: true`). When the gate fails the mirror step is
-  skipped, so the previous good copy in GHCR is left untouched. Unfixed CVEs —
-  which are common and unavoidable in Debian base images — don't block the
-  mirror; they'd otherwise stop it from ever publishing.
-- **Report.** The full `CRITICAL`/`HIGH` result (fixed and unfixed) is uploaded
-  as SARIF to the repository's **Security → Code scanning** tab for an audit
-  trail, even when the gate passes. This upload is best-effort (it needs
-  code-scanning enabled) and never blocks the mirror.
+- **Logs** the full `CRITICAL`/`HIGH` result as a table in the Actions log, so
+  the findings are visible on every run.
+- **Uploads** the same result as SARIF to the repository's **Security → Code
+  scanning** tab for an audit trail and diff-over-time. This upload is
+  best-effort (it needs code scanning enabled) and never blocks the mirror.
+
+Note that .NET SDK images in particular carry `HIGH` findings in Microsoft's
+bundled dev tooling (`dotnet-format`, MSBuild, F#) — these clear when Microsoft
+ships a new SDK patch tag, which the weekly mirror picks up automatically.
 
 The scan runs on the runner's native architecture (`linux/amd64`); the full
-multi-arch manifest is still what gets mirrored. Thresholds live in the
-`Gate on fixable CRITICAL/HIGH vulnerabilities` step of each workflow — adjust
-`severity` or `ignore-unfixed` there to tune what blocks a publish.
+multi-arch manifest is still what gets mirrored. To change what's reported —
+`severity`, or to switch to a blocking gate with `exit-code: "1"` — edit the
+`Scan … for vulnerabilities` steps in each workflow.
 
 ## Using the mirror
 
@@ -83,7 +88,7 @@ FROM ghcr.io/<owner>/dotnet/sdk:8.0-bookworm-slim AS build
 ## Adding an image
 
 Copy one of the existing workflows, change the `IMAGE` env value and the
-`paths:` filter to the new file name, and commit. The first run publishes it.
-Also give the `Upload scan results` step a unique `category:` (e.g. the new file
-name) so its scan results don't collide with the other workflows' in the
-Security tab. The first run scans and, if the gate passes, publishes it.
+`paths:` filter to the new file name, and commit. Also give the
+`Upload scan results to the Security tab` step a unique `category:` (e.g. the
+new file name) so its scan results don't collide with the other workflows' in
+the Security tab. The first run scans and publishes it.

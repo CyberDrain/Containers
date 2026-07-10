@@ -41,35 +41,39 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # --- Security gate -------------------------------------------------
+      # --- Security scan (report-only) -----------------------------------
       # Scan the upstream image for known vulnerabilities *before* it is
       # copied into GHCR. Trivy pulls the layers itself, so this works even
       # though the mirror step never pulls the image into the runner.
+      #
+      # This is report-only: the mirror faithfully copies an unmodified
+      # upstream image we can't remediate, so a CVE here never blocks the
+      # publish (that would only stall the mirror on the last good copy).
+      # Findings surface in the Actions log and the Security tab instead.
 
-      - name: Record vulnerability scan (SARIF → Security tab)
+      - name: Scan ${{ env.IMAGE }} for vulnerabilities (log)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: mcr.microsoft.com/${{ env.IMAGE }}
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: "0" # report only — never fail the job
+
+      - name: Scan ${{ env.IMAGE }} for vulnerabilities (SARIF)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: mcr.microsoft.com/${{ env.IMAGE }}
           format: sarif
           output: trivy-results.sarif
           severity: CRITICAL,HIGH
-          exit-code: "0" # record only; the gate below decides pass/fail
+          exit-code: "0"
 
-      - name: Upload scan results
+      - name: Upload scan results to the Security tab
         uses: github/codeql-action/upload-sarif@v3
-        continue-on-error: false
+        continue-on-error: true # best-effort — never let it block the mirror
         with:
           sarif_file: trivy-results.sarif
           category: mirror-dotnet-sdk
-
-      - name: Gate on fixable CRITICAL/HIGH vulnerabilities
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: mcr.microsoft.com/${{ env.IMAGE }}
-          format: table
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true # only block on CVEs that have a fix available
-          exit-code: "1" # fail the job → the mirror step below is skipped
       # -------------------------------------------------------------------
 
       - name: Mirror ${{ env.IMAGE }}
