@@ -21,15 +21,21 @@ while the upstream is down.
 The .NET base images from the Microsoft Container Registry (`mcr.microsoft.com`,
 backed by Azure Container Registry):
 
-| Upstream (MCR)                                                      | Mirror (GHCR)                                                     |
+| Upstream (MCR)                                                       | Mirror (GHCR)                                                      |
 | ------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | `mcr.microsoft.com/dotnet/sdk:8.0-bookworm-slim`                    | `ghcr.io/<owner>/dotnet/sdk:8.0-bookworm-slim`                   |
+| `mcr.microsoft.com/dotnet/sdk:10.0-noble`                           | `ghcr.io/<owner>/dotnet/sdk:10.0-noble`                          |
 | `mcr.microsoft.com/dotnet/aspnet:8.0-bookworm-slim`                 | `ghcr.io/<owner>/dotnet/aspnet:8.0-bookworm-slim`                |
+| `mcr.microsoft.com/dotnet/aspnet:10.0-noble`                        | `ghcr.io/<owner>/dotnet/aspnet:10.0-noble`                       |
 | `mcr.microsoft.com/dotnet/aspnet:8.0-azurelinux3.0-distroless-extra` | `ghcr.io/<owner>/dotnet/aspnet:8.0-azurelinux3.0-distroless-extra` |
+| `mcr.microsoft.com/dotnet/aspnet:10.0-azurelinux3.0-distroless-extra` | `ghcr.io/<owner>/dotnet/aspnet:10.0-azurelinux3.0-distroless-extra` |
 
 Their roles in the Craft build: the **SDK** compiles/publishes the app, the
-**Debian aspnet** stages libmimalloc, and the **Azure Linux distroless-extra
-aspnet** is the runtime base of the shipped (distroless) image.
+**Debian/Ubuntu aspnet** stages libmimalloc, and the **Azure Linux
+distroless-extra aspnet** is the runtime base of the shipped (distroless) image.
+.NET 8 uses Debian (`bookworm-slim`); .NET 10 dropped Debian, so its SDK and
+mimalloc stages use Ubuntu (`noble`). Each mirror workflow carries one tag per
+supported .NET line (a matrix), so adding a major means extending that list.
 
 The path after the registry host is preserved verbatim, and `<owner>` is the
 lower-cased repository owner.

@@ -1,8 +1,9 @@
 name: "Mirror: dotnet/sdk → GHCR"
 
-# Mirrors mcr.microsoft.com/dotnet/sdk:8.0-bookworm-slim (Microsoft Container
-# Registry, backed by Azure Container Registry) into GHCR, so the CyberDrain
-# app images keep building during an MCR / ACR outage. See README.md.
+# Mirrors the .NET SDK build-stage base for each supported .NET line into GHCR, so the
+# CyberDrain app images keep building during an MCR / ACR outage. See README.md.
+# .NET 8 ships Debian (bookworm-slim); .NET 10 dropped Debian for Ubuntu (noble).
+# One job per tag (matrix below) so a new major is added by extending the list.
 
 on:
   schedule:
@@ -14,9 +15,6 @@ on:
     paths:
       - ".github/workflows/mirror-dotnet-sdk.yml"
 
-env:
-  IMAGE: dotnet/sdk:8.0-bookworm-slim
-
 permissions:
   contents: read
   packages: write
@@ -25,6 +23,12 @@ permissions:
 jobs:
   mirror:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # one .NET line failing must not cancel the others
+      matrix:
+        tag: ["8.0-bookworm-slim", "10.0-noble"]
+    env:
+      IMAGE: dotnet/sdk:${{ matrix.tag }}
     steps:
       - name: Set lower case owner name
         run: echo "OWNER_LC=${OWNER,,}" >> $GITHUB_ENV
@@ -73,7 +77,7 @@ jobs:
         continue-on-error: true # best-effort — never let it block the mirror
         with:
           sarif_file: trivy-results.sarif
-          category: mirror-dotnet-sdk
+          category: mirror-dotnet-sdk-${{ matrix.tag }}
       # -------------------------------------------------------------------
 
       - name: Mirror ${{ env.IMAGE }}

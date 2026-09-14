@@ -1,9 +1,10 @@
 name: "Mirror: dotnet/aspnet (azurelinux distroless-extra) → GHCR"
 
-# Mirrors mcr.microsoft.com/dotnet/aspnet:8.0-azurelinux3.0-distroless-extra
+# Mirrors mcr.microsoft.com/dotnet/aspnet:{8.0,10.0}-azurelinux3.0-distroless-extra
 # (Microsoft Container Registry, backed by Azure Container Registry) into GHCR.
 # This is the runtime base for the CyberDrain Craft distroless image; mirroring
 # keeps app builds working during an MCR / ACR outage. See README.md.
+# One job per tag (matrix below) so a new major is added by extending the list.
 
 on:
   schedule:
@@ -15,9 +16,6 @@ on:
     paths:
       - ".github/workflows/mirror-dotnet-aspnet-distroless.yml"
 
-env:
-  IMAGE: dotnet/aspnet:8.0-azurelinux3.0-distroless-extra
-
 permissions:
   contents: read
   packages: write
@@ -26,6 +24,12 @@ permissions:
 jobs:
   mirror:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # one .NET line failing must not cancel the others
+      matrix:
+        tag: ["8.0-azurelinux3.0-distroless-extra", "10.0-azurelinux3.0-distroless-extra"]
+    env:
+      IMAGE: dotnet/aspnet:${{ matrix.tag }}
     steps:
       - name: Set lower case owner name
         run: echo "OWNER_LC=${OWNER,,}" >> $GITHUB_ENV
@@ -74,7 +78,7 @@ jobs:
         continue-on-error: true # best-effort — never let it block the mirror
         with:
           sarif_file: trivy-results.sarif
-          category: mirror-dotnet-aspnet-distroless
+          category: mirror-dotnet-aspnet-distroless-${{ matrix.tag }}
       # -------------------------------------------------------------------
 
       - name: Mirror ${{ env.IMAGE }}
