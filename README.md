@@ -19,9 +19,9 @@ while the upstream is down.
 ## What's mirrored
 
 The .NET base images from the Microsoft Container Registry (`mcr.microsoft.com`,
-backed by Azure Container Registry):
+backed by Azure Container Registry), plus the Alpine base from Docker Hub:
 
-| Upstream (MCR)                                                       | Mirror (GHCR)                                                      |
+| Upstream                                                             | Mirror (GHCR)                                                      |
 | ------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | `mcr.microsoft.com/dotnet/sdk:8.0-bookworm-slim`                    | `ghcr.io/<owner>/dotnet/sdk:8.0-bookworm-slim`                   |
 | `mcr.microsoft.com/dotnet/sdk:10.0-noble`                           | `ghcr.io/<owner>/dotnet/sdk:10.0-noble`                          |
@@ -29,12 +29,15 @@ backed by Azure Container Registry):
 | `mcr.microsoft.com/dotnet/aspnet:10.0-noble`                        | `ghcr.io/<owner>/dotnet/aspnet:10.0-noble`                       |
 | `mcr.microsoft.com/dotnet/aspnet:8.0-azurelinux3.0-distroless-extra` | `ghcr.io/<owner>/dotnet/aspnet:8.0-azurelinux3.0-distroless-extra` |
 | `mcr.microsoft.com/dotnet/aspnet:10.0-azurelinux3.0-distroless-extra` | `ghcr.io/<owner>/dotnet/aspnet:10.0-azurelinux3.0-distroless-extra` |
+| `mcr.microsoft.com/dotnet/aspnet:10.0-alpine`                        | `ghcr.io/<owner>/dotnet/aspnet:10.0-alpine`                        |
+| `docker.io/library/alpine:3.24` (Docker Hub)                         | `ghcr.io/<owner>/library/alpine:3.24`                              |
 
 Their roles in the Craft build: the **SDK** compiles/publishes the app, the
-**Debian/Ubuntu aspnet** stages libmimalloc, and the **Azure Linux
-distroless-extra aspnet** is the runtime base of the shipped (distroless) image.
-.NET 8 uses Debian (`bookworm-slim`); .NET 10 dropped Debian, so its SDK and
-mimalloc stages use Ubuntu (`noble`). Each mirror workflow carries one tag per
+**Alpine aspnet** supplies the musl .NET runtime, and **Alpine** is where the
+shell-less runtime root is staged with `apk --root`. The **distroless-extra
+aspnet** images are the runtime base of the .NET 8 and pre-Alpine builds.
+.NET 8 uses Debian (`bookworm-slim`); .NET 10 dropped Debian, so its SDK uses
+Ubuntu (`noble`). Each mirror workflow carries one tag per
 supported .NET line (a matrix), so adding a major means extending that list.
 
 The path after the registry host is preserved verbatim, and `<owner>` is the
@@ -47,6 +50,7 @@ Each image has its own workflow:
 - [`.github/workflows/mirror-dotnet-sdk.yml`](.github/workflows/mirror-dotnet-sdk.yml)
 - [`.github/workflows/mirror-dotnet-aspnet.yml`](.github/workflows/mirror-dotnet-aspnet.yml)
 - [`.github/workflows/mirror-dotnet-aspnet-distroless.yml`](.github/workflows/mirror-dotnet-aspnet-distroless.yml)
+- [`.github/workflows/mirror-alpine.yml`](.github/workflows/mirror-alpine.yml)
 
 Each runs weekly (Monday 06:00 UTC), on demand (`workflow_dispatch`), and when
 its own workflow file changes. They authenticate to GHCR with the default

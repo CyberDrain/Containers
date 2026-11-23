@@ -1,0 +1,97 @@
+name: "Mirror: library/alpine → GHCR"
+
+# Mirrors docker.io/library/alpine:{3.24}
+# (Docker Hub, which rate-limits anonymous and shared-IP pulls) into GHCR.
+# The Craft runtime stages its shell-less Alpine root from this image with apk; mirroring
+# keeps app builds working during a Docker Hub outage or rate limit. See README.md.
+# One job per tag (matrix below); bump it with the Alpine line in the Craft Dockerfile.
+
+on:
+  schedule:
+    # Weekly, Monday 06:00 UTC — picks up Alpine patch releases.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/mirror-alpine.yml"
+
+permissions:
+  contents: read
+  packages: write
+  security-events: write # upload the Trivy SARIF report to the Security tab
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # one tag failing must not cancel the others
+      matrix:
+        tag: ["3.24"]
+    env:
+      IMAGE: library/alpine:${{ matrix.tag }}
+    steps:
+      - name: Set lower case owner name
+        run: echo "OWNER_LC=${OWNER,,}" >> $GITHUB_ENV
+        env:
+          OWNER: ${{ github.repository_owner }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # --- Security scan (report-only) -----------------------------------
+      # Scan the upstream image for known vulnerabilities *before* it is
+      # copied into GHCR. Trivy pulls the layers itself, so this works even
+      # though the mirror step never pulls the image into the runner.
+      #
+      # This is report-only: the mirror faithfully copies an unmodified
+      # upstream image we can't remediate, so a CVE here never blocks the
+      # publish (that would only stall the mirror on the last good copy).
+      # Findings surface in the Actions log and the Security tab instead.
+
+      - name: Scan ${{ env.IMAGE }} for vulnerabilities (log)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: docker.io/${{ env.IMAGE }}
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: "0" # report only — never fail the job
+
+      - name: Scan ${{ env.IMAGE }} for vulnerabilities (SARIF)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: docker.io/${{ env.IMAGE }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "0"
+
+      - name: Upload scan results to the Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true # best-effort — never let it block the mirror
+        with:
+          sarif_file: trivy-results.sarif
+          category: mirror-alpine-${{ matrix.tag }}
+      # -------------------------------------------------------------------
+
+      - name: Mirror ${{ env.IMAGE }}
+        run: |
+          set -euo pipefail
+          SRC="docker.io/${IMAGE}"
+          DST="ghcr.io/${OWNER_LC}/${IMAGE}"
+
+          echo "Mirroring $SRC -> $DST"
+          # Copies the full multi-arch manifest (amd64 + arm64) straight
+          # between registries — layers are mounted, not pulled into the runner.
+          docker buildx imagetools create --tag "$DST" "$SRC"
+
+          echo "::group::Mirrored manifest"
+          docker buildx imagetools inspect "$DST"
+          echo "::endgroup::"

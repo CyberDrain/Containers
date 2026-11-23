@@ -1,9 +1,9 @@
 name: "Mirror: dotnet/aspnet → GHCR"
 
-# Mirrors the Debian-family aspnet base used to stage libmimalloc for each supported
-# .NET line into GHCR, so the CyberDrain app images keep building during an MCR / ACR
-# outage. See README.md. .NET 8 ships Debian (bookworm-slim); .NET 10 dropped Debian
-# for Ubuntu (noble). One job per tag (matrix below) so a new major is added by extending it.
+# Mirrors the aspnet images the CyberDrain app images build from into GHCR, so they keep
+# building during an MCR / ACR outage. See README.md. .NET 8 ships Debian (bookworm-slim);
+# .NET 10 dropped Debian for Ubuntu (noble). 10.0-alpine supplies the musl .NET runtime for
+# the shell-less Alpine Craft image. One job per tag (matrix below).
 
 on:
   schedule:
@@ -26,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false # one .NET line failing must not cancel the others
       matrix:
-        tag: ["8.0-bookworm-slim", "10.0-noble"]
+        tag: ["8.0-bookworm-slim", "10.0-noble", "10.0-alpine"]
     env:
       IMAGE: dotnet/aspnet:${{ matrix.tag }}
     steps:
